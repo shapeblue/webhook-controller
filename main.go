@@ -324,5 +324,5 @@ func main() {
 	GetCommands()
 	log.Println("server started")
 	http.HandleFunc("/webhook", handleWebhook)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8089", nil))
 }

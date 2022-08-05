@@ -16,7 +16,7 @@ services:
       RABBITMQ_SSL_VERIFY: "verify_peer"
       RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT: "true"
     volumes:
-      - "./cert:/cert"
+      - "./certs:/cert"
     env_file:
       - .env 
 
@@ -24,8 +24,10 @@ services:
     build: .
     image: webhook-controller
     ports:
-      - "8080:8089"
+      - "8089:8089"
     env_file:
       - .env 
+    depends_on:
+      - rabbit
 
 
