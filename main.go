@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,29 +13,33 @@ import (
 	"reflect"
 	"strings"
 
-	msgbroker "github.com/apache/webhook-controller/messagebroker"
+	msgbroker "github.com/shapeblue/webhook-controller/messagebroker"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 )
 
 const (
-	commandPrefix = "//"
+	commandPrefix = "/"
 )
 
-var RepoCommandsMap = map[string]interface{}{
-	"cluster-api-provider-cloudstack": map[string]interface{}{
-		"owner": "pearl1594", // TODO: change to kubernetes-sigs
-		"//run-e2e": map[string]interface{}{
-			"project":      "capc-builder",
-			"exchangeName": "CAPCExchange",
-			"args":         []string{"K8S_VERSION", "HYPERVISOR", "OS", "ACS_VERSION"},
-			"K8S_VERSION":  []string{"1.23.3", "1.22.6"},
-			"HYPERVISOR":   []string{"kvm", "xen", "vmware"},
-			"OS":           []string{"ubuntu-2004", "rockylinux-8"},
-			"ACS_VERSION":  []string{"4.16", "4.14", "4.17"},
-		},
-	},
+var RepoCommandsMap map[string]interface{}
+
+func GetCommands() {
+	jsonFile, err := os.Open("commands.json")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Println("Successfully Opened commands.json")
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer jsonFile.Close()
+	dataBytes, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	json.Unmarshal(dataBytes, &RepoCommandsMap)
 }
 
 func getValidCommandsForRepo(repoName string) []string {
@@ -44,7 +49,6 @@ func getValidCommandsForRepo(repoName string) []string {
 	for i, cmd := range commands {
 		cmds[i] = cmd.String()
 	}
-
 	return cmds
 }
 
@@ -102,6 +106,14 @@ func IfValidCommand(repoName, command string) bool {
 		return true
 	}
 	return false
+}
+
+func converToStringArray(data []interface{}) []string {
+	s := make([]string, len(data))
+	for i, v := range data {
+		s[i] = fmt.Sprint(v)
+	}
+	return s
 }
 
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -164,12 +176,17 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 			args := splitCmd[1:]
 			if IfValidCommand(repoName, command) {
 				prData.ExchangeName = RepoCommandsMap[repoName].(map[string]interface{})[command].(map[string]interface{})["exchangeName"].(string)
-				handleCommand(command, args, *prData)
+				err = handleCommand(command, args, *prData)
 			} else {
-				helpertext := PrintCommandsList(*prData)
-				postResponseToGitHubRepo(*prData, helpertext)
+				log.Println("Not a command for me, ignoring..")
+				// helpertext := PrintCommandsList(*prData)
+				// err = postResponseToGitHubRepo(*prData, helpertext)
 			}
-
+			if err != nil {
+				log.Printf("Error: %v", err.Error())
+				postResponseToGitHubRepo(*prData, "Failed to create job to execute: "+command)
+				return
+			}
 		} else {
 			log.Println("Not a command, ignoring..")
 		}
@@ -184,7 +201,7 @@ func PrintCommandsList(prData PRData) string {
 			continue
 		}
 		resp += fmt.Sprintf("\n<b>Command: `%s`</b> \n", cmd)
-		validArgsList := data.(map[string]interface{})["args"].([]string)
+		validArgsList := converToStringArray(data.(map[string]interface{})["args"].([]interface{}))
 		resp += helpText(prData, cmd, validArgsList, data.(map[string]interface{}))
 	}
 
@@ -200,7 +217,7 @@ func helpText(prData PRData, command string, validArgs []string, repoData map[st
 
 	helpText += fmt.Sprintf("\n```\nFollowing are supported values for each parameters: \n ```\n")
 	for _, validArg := range validArgs {
-		helpText += fmt.Sprintf("%s: %s\n", validArg, strings.Join(repoData[validArg].([]string), ","))
+		helpText += fmt.Sprintf("%s: %s\n", validArg, strings.Join(converToStringArray(repoData[validArg].([]interface{})), ","))
 	}
 
 	helpText += "```"
@@ -232,13 +249,13 @@ func validateCommandArgs(prData PRData, repoData map[string]interface{}, cmd str
 	return true, dataParams
 }
 
-func handleCommand(command string, args []string, prData PRData) {
+func handleCommand(command string, args []string, prData PRData) error {
 	repoData := RepoCommandsMap[prData.getRepoName()].(map[string]interface{})[command].(map[string]interface{})
 	var dataParams []JobData
 	if len(args) > 0 {
 		isValid, params := validateCommandArgs(prData, repoData, command, args)
 		if !isValid {
-			return
+			return errors.New("Invalid command passed")
 		}
 		if len(params) > 0 {
 			dataParams = append(dataParams, params...)
@@ -273,9 +290,10 @@ func handleCommand(command string, args []string, prData PRData) {
 	if err != nil {
 		log.Println("FAILED to public message to broker")
 		postResponseToGitHubRepo(prData, fmt.Sprintf("Failed to start Jenkins job for `%s`", command))
-		return
+		return err
 	}
-	postResponseToGitHubRepo(prData, fmt.Sprintf("Jenkins job created for running `%s`, will keep you posted when the result is ready", command))
+	err = postResponseToGitHubRepo(prData, fmt.Sprintf("Jenkins job created for running `%s`, will keep you posted when the result is ready", command))
+	return err
 }
 
 func postResponseToGitHubRepo(prData PRData, body string) error {
@@ -303,12 +321,8 @@ func postResponseToGitHubRepo(prData PRData, body string) error {
 }
 
 func main() {
+	GetCommands()
 	log.Println("server started")
 	http.HandleFunc("/webhook", handleWebhook)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
-
-/* TODO
-- Based on OS determine template - replace os with template
-- After successfully publishing - send a comment as bo? prompting that a job's been created to run e2e tests
-*/

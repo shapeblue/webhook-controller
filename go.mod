@@ -1,4 +1,4 @@
-module github.com/apache/webhook-controller
+module github.com/shapeblue/webhook-controller
 
 go 1.16
 

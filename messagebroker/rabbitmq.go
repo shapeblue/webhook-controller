@@ -29,6 +29,26 @@ func failOnError(err error, msg string) {
 
 func ConnectToRabbitMQ(exchangeName string) (*amqp.Channel, error) {
 	// Create a new RabbitMQ connection.
+	// caCert, err := ioutil.ReadFile("./certs/client/ca_certificate.pem")
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// cert, err := tls.LoadX509KeyPair("./certs/client/client_certificate.pem", "./certs/client/client_key.pem")
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// rootCAs := x509.NewCertPool()
+	// rootCAs.AppendCertsFromPEM(caCert)
+
+	// tlsConf := &tls.Config{
+	// 	RootCAs:      rootCAs,
+	// 	Certificates: []tls.Certificate{cert},
+	// 	ServerName:   "rabbit", // Optional
+	// }
+
+	// connectRabbitMQ, err := amqp.DialTLS(AMQP_SERVER_URL, tlsConf)
 	connectRabbitMQ, err := amqp.Dial(AMQP_SERVER_URL)
 	if err != nil {
 		return nil, err
@@ -57,13 +77,15 @@ func ConnectToRabbitMQ(exchangeName string) (*amqp.Channel, error) {
 
 func PublishMessage(message Message) error {
 	ch, err := ConnectToRabbitMQ(message.ExchangeName)
-	defer ch.Close()
+	if ch != nil {
+		defer ch.Close()
+	}
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ due to %v", err.Error())
+		log.Printf("Failed to connect to RabbitMQ due to %v", err.Error())
 		return err
 	}
 	jsonStr, _ := json.Marshal(message.Message)
-	fmt.Printf("Publishing message: %v", message.Message)
+	log.Printf("Publishing message: %v", message.Message)
 	err = ch.Publish(
 		message.ExchangeName, // exchange
 		"",                   // routing key
@@ -76,7 +98,7 @@ func PublishMessage(message Message) error {
 			Body:         []byte(jsonStr),
 		})
 	if err != nil {
-		fmt.Printf("Failed to publish: %v", err.Error())
+		log.Printf("Failed to publish: %v", err.Error())
 	}
 
 	return err
