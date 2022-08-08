@@ -1,6 +1,7 @@
 version: "3.4"
 services:
   rabbit:
+    hostname: rabbitmq.sblab.uk
     image: "rabbitmq:3.8.3-management-alpine"
     ports:
       - "5671:5671"   # For TLS
@@ -8,17 +9,18 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: "${RABBITMQ_PASSWORD}"
-      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_USERNAME}"
-      RABBITMQ_SSL_CACERTFILE: "/cert/ca_certificate.pem"
-      RABBITMQ_SSL_CERTFILE: "/cert/server_certificate.pem"
-      RABBITMQ_SSL_KEYFILE: "/cert/server_key.pem"
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USERNAME}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
+      RABBITMQ_SSL_CACERTFILE: "/cert/RMQ-CA-cert.pem"
+      RABBITMQ_SSL_CERTFILE: "/cert/RMQ-server-cert.pem"
+      RABBITMQ_SSL_KEYFILE: "/cert/RMQ-server-key.pem"
       RABBITMQ_SSL_VERIFY: "verify_peer"
       RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT: "true"
     volumes:
-      - "./certs:/cert"
+      - "./certificates:/cert" 
     env_file:
-      - .env 
+      - .env
+    restart: on-failure
 
   app:
     build: .
@@ -29,5 +31,6 @@ services:
       - .env 
     depends_on:
       - rabbit
+    restart: on-failure
 
 

@@ -59,6 +59,7 @@ type PRData struct {
 	Repo_URL     string
 	RepoName     string
 	ExchangeName string
+	Queues       []string
 }
 
 func (pr PRData) getPRId() int {
@@ -75,6 +76,10 @@ func (pr PRData) getRepoName() string {
 
 func (pr PRData) getExchangeName() string {
 	return pr.ExchangeName
+}
+
+func (pr PRData) getQueues() []string {
+	return pr.Queues
 }
 
 func contains(elems []string, v string) bool {
@@ -176,6 +181,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 			args := splitCmd[1:]
 			if IfValidCommand(repoName, command) {
 				prData.ExchangeName = RepoCommandsMap[repoName].(map[string]interface{})[command].(map[string]interface{})["exchangeName"].(string)
+				prData.Queues = converToStringArray(RepoCommandsMap[repoName].(map[string]interface{})[command].(map[string]interface{})["queues"].([]interface{}))
 				err = handleCommand(command, args, *prData)
 			} else {
 				log.Println("Not a command for me, ignoring..")
@@ -226,11 +232,11 @@ func helpText(prData PRData, command string, validArgs []string, repoData map[st
 }
 
 func validateCommandArgs(prData PRData, repoData map[string]interface{}, cmd string, args []string) (bool, []JobData) {
-	validArgsList := repoData["args"].([]string)
+	validArgsList := converToStringArray(repoData["args"].([]interface{}))
 	var dataParams []JobData
 	for idx, arg := range args {
 		validArg := validArgsList[idx]
-		validArgVals := repoData[validArg].([]string)
+		validArgVals := converToStringArray(repoData[validArg].([]interface{}))
 		if !contains(validArgVals, arg) {
 			resp := helpText(prData, cmd, validArgsList, repoData)
 			postResponseToGitHubRepo(prData, resp)
@@ -283,6 +289,7 @@ func handleCommand(command string, args []string, prData PRData) error {
 
 	msg := msgbroker.Message{
 		ExchangeName: prData.getExchangeName(),
+		Queues:       prData.getQueues(),
 		Message:      data,
 	}
 	log.Println("Publishing job request to message broker")

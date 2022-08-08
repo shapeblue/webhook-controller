@@ -18,6 +18,7 @@ var AMQP_SERVER_URL = fmt.Sprintf("amqp://%s:%s@%s", uname, psswd, endpoint)
 
 type Message struct {
 	ExchangeName string
+	Queues       []string
 	Message      map[string]interface{}
 }
 
@@ -64,7 +65,7 @@ func ConnectToRabbitMQ(exchangeName string) (*amqp.Channel, error) {
 	// publish and subscribe to.)
 	err = channelRabbitMQ.ExchangeDeclare(
 		exchangeName,
-		"direct",
+		"fanout",
 		true,
 		false,
 		false,
@@ -83,6 +84,29 @@ func PublishMessage(message Message) error {
 	if err != nil {
 		log.Printf("Failed to connect to RabbitMQ due to %v", err.Error())
 		return err
+	}
+
+	for _, queue := range message.Queues {
+		q, err := ch.QueueDeclare(
+			queue,
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			return fmt.Errorf("Queue declare: %s", err)
+		}
+		if err = ch.QueueBind(
+			q.Name,               // name of the queue
+			"",                   // bindingKey
+			message.ExchangeName, // sourceExchange
+			false,                // noWait
+			nil,                  // arguments
+		); err != nil {
+			return fmt.Errorf("Queue Bind: %s", err)
+		}
 	}
 	jsonStr, _ := json.Marshal(message.Message)
 	log.Printf("Publishing message: %v", message.Message)
