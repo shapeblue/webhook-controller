@@ -1,0 +1,15 @@
+{
+	"cluster-api-provider-cloudstack": {
+		"owner": "pearl1594", 
+		"/run-e2e": {
+			"project":      "capc-builder",
+			"exchangeName": "CAPCExchange",
+			"queues": 		["capc_builder_queue1", "capc_builder_queue2", "capc_builder_queue3"],
+			"args":         ["K8S_VERSION", "HYPERVISOR", "OS", "ACS_VERSION"],
+			"K8S_VERSION":  ["1.23.3", "1.22.6"],
+			"HYPERVISOR":   ["kvm", "xen", "vmware"],
+			"OS":           ["ubuntu-2004", "rockylinux-8"],
+			"ACS_VERSION":  ["4.16", "4.14", "4.17"]
+		}
+	}
+}

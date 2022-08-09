@@ -1,0 +1,36 @@
+version: "3.4"
+services:
+  rabbit:
+    hostname: rabbitmq.sblab.uk
+    image: "rabbitmq:3.8.3-management-alpine"
+    ports:
+      - "5671:5671"   # For TLS
+      - "15671:15671" # For UI (HTTP)
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - UID=100
+      - GID=101
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_SSL_CACERTFILE=/cert/ca_certificate.pem
+      - RABBITMQ_SSL_CERTFILE=/cert/server_rabbitmq.sblab.uk_certificate.pem
+      - RABBITMQ_SSL_KEYFILE=/cert/server_rabbitmq.sblab.uk_key.pem
+      - RABBITMQ_SSL_VERIFY=verify_peer
+      - RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT=true
+    volumes:
+      - "./certificates:/cert" 
+    env_file:
+      - .env
+    restart: on-failure
+
+  app:
+    build: .
+    image: webhook-controller
+    ports:
+      - "8089:8089"
+    env_file:
+      - .env 
+    depends_on:
+      - rabbit
+    restart: on-failure
