@@ -9,13 +9,15 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USERNAME}"
-      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
-      RABBITMQ_SSL_CACERTFILE: "/cert/RMQ-CA-cert.pem"
-      RABBITMQ_SSL_CERTFILE: "/cert/RMQ-server-cert.pem"
-      RABBITMQ_SSL_KEYFILE: "/cert/RMQ-server-key.pem"
-      RABBITMQ_SSL_VERIFY: "verify_peer"
-      RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT: "true"
+      - UID=100
+      - GID=101
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_SSL_CACERTFILE=/cert/ca_certificate.pem
+      - RABBITMQ_SSL_CERTFILE=/cert/server_rabbitmq.sblab.uk_certificate.pem
+      - RABBITMQ_SSL_KEYFILE=/cert/server_rabbitmq.sblab.uk_key.pem
+      - RABBITMQ_SSL_VERIFY=verify_peer
+      - RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT=true
     volumes:
       - "./certificates:/cert" 
     env_file:
@@ -32,5 +34,3 @@ services:
     depends_on:
       - rabbit
     restart: on-failure
-
-
