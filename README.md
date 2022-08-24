@@ -49,9 +49,13 @@ The assumption is that we will have 3  mixed environments available for the ACS 
 
 The pre-existing enviroments will have the required CAPC templates registered and the required service offerings will be pre-created. 
 
+### Configure Jenkins - RabbitMQ Consumer
+
+![image](https://user-images.githubusercontent.com/10495417/186386062-7ef307c7-7fab-43ea-826c-86daade5632a.png)
+
 
 #### WebHook Controller Usage
-This controller connects is registered as a repository level webhook against respective repos. A constant set of commands are maintained for each repository. Data such as github access tokens, message broker endpoint , username and password are exported as env variables
+A repository level webhook is registered against respective repos. A constant set of commands are maintained for each repository. Data such as github access tokens, message broker endpoint , username and password are exported as env variables
 
 ```
 GITHUB_ACCESS_TOKEN="XXXXXXXXXXXXXXXXXXXXX"
