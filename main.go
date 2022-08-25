@@ -25,6 +25,13 @@ const (
 
 var RepoCommandsMap map[string]interface{}
 
+var Labels = map[string]string{
+	"do-not-merge":     "eb4034",
+	"test-in-progress": "f2f54c",
+	"test-successful":  "1aed41",
+	"test-failed":      "eb4034",
+}
+
 func GetCommands() {
 	jsonFile, err := os.Open("commands.json")
 	if err != nil {
@@ -278,6 +285,11 @@ func handleCommand(command string, args []string, prData PRData) error {
 		"value": prData.getRepoUrl(),
 	})
 
+	dataParams = append(dataParams, JobData{
+		"name":  "CLEANUP_WHEN_FINISHED",
+		"value": true,
+	})
+
 	var data = make(JobData)
 	if data["parameter"] == nil {
 		data["parameter"] = map[string]string{}
@@ -300,7 +312,43 @@ func handleCommand(command string, args []string, prData PRData) error {
 		return err
 	}
 	err = postResponseToGitHubRepo(prData, fmt.Sprintf("Jenkins job created for running `%s`, will keep you posted when the result is ready", command))
-	return err
+	if err != nil {
+		return err
+	}
+	labels := []string{"do-not-merge", "test-in-progress"}
+	addLabels(prData, labels...)
+	return nil
+}
+
+func addLabels(prData PRData, labels ...string) {
+	ctx := context.Background()
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: os.Getenv("GITHUB_ACCESS_TOKEN")},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+
+	client := github.NewClient(tc)
+	owner := RepoCommandsMap[prData.getRepoName()].(map[string]interface{})["owner"].(string)
+	_, _, err := client.Issues.AddLabelsToIssue(ctx, owner, prData.getRepoName(), prData.getPRId(), labels)
+	if err != nil {
+		log.Printf("failed to add label to issue due to %v", prettify(err))
+	}
+}
+
+func prettify(err error) error {
+	switch err := err.(type) {
+	default:
+		return err
+	case *github.ErrorResponse:
+		switch {
+		case len(err.Errors) != 1:
+			return err
+		case err.Errors[0].Code == "custom":
+			return errors.New(err.Errors[0].Message)
+		default:
+			return errors.New(err.Errors[0].Code)
+		}
+	}
 }
 
 func postResponseToGitHubRepo(prData PRData, body string) error {

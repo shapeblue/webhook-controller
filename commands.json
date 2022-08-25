@@ -2,7 +2,7 @@
 	"cluster-api-provider-cloudstack": {
 		"owner": "pearl1594", 
 		"/run-e2e": {
-			"project":      "capc-builder",
+			"project":      "test-capc-builder",
 			"exchangeName": "CAPCExchange",
 			"queues": 		["capc_builder_queue1", "capc_builder_queue2", "capc_builder_queue3"],
 			"args":         ["K8S_VERSION", "HYPERVISOR", "OS", "ACS_VERSION"],
