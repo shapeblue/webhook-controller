@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -66,6 +67,7 @@ type PRData struct {
 	Repo_URL     string
 	RepoName     string
 	ExchangeName string
+	Owner        string
 	Queues       []string
 }
 
@@ -128,6 +130,16 @@ func converToStringArray(data []interface{}) []string {
 	return s
 }
 
+func handleTest(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received test")
+	io.WriteString(w, "Hello from a HandleFunc #1!\n")
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received /health")
+	io.WriteString(w, "OK\n")
+}
+
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
 	webhookBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -137,6 +149,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	event, err := github.ParseWebHook(github.WebHookType(r), webhookBody)
+	prettyPrint(event)
 	if err != nil {
 		log.Printf("could not parse webhook: err=%s\n", err)
 		return
@@ -171,7 +184,11 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 		break
 
 	case *github.IssueCommentEvent:
+		if *event.Action != "created" {
+			return
+		}
 		comment := event.Comment.GetBody()
+		owner := event.Repo.Owner.Login
 		log.Println("Recieved a pull request comment event")
 		repoUrl := strings.Split(event.GetIssue().GetHTMLURL(), "/pull")[0]
 		repoName := repoUrl[strings.LastIndex(repoUrl, "/")+1:]
@@ -180,6 +197,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 			PR_ID:    event.GetIssue().GetNumber(),
 			Repo_URL: repoUrl,
 			RepoName: repoName,
+			Owner:    *owner,
 		}
 
 		if strings.HasPrefix(comment, commandPrefix) {
@@ -311,7 +329,7 @@ func handleCommand(command string, args []string, prData PRData) error {
 		postResponseToGitHubRepo(prData, fmt.Sprintf("Failed to start Jenkins job for `%s`", command))
 		return err
 	}
-	err = postResponseToGitHubRepo(prData, fmt.Sprintf("Jenkins job created for running `%s`, will keep you posted when the result is ready", command))
+	err = postResponseToGitHubRepo(prData, fmt.Sprintf("A job created for running `%s`, will keep you posted when the result is ready", command))
 	if err != nil {
 		return err
 	}
@@ -328,8 +346,7 @@ func addLabels(prData PRData, labels ...string) {
 	tc := oauth2.NewClient(ctx, ts)
 
 	client := github.NewClient(tc)
-	owner := RepoCommandsMap[prData.getRepoName()].(map[string]interface{})["owner"].(string)
-	_, _, err := client.Issues.AddLabelsToIssue(ctx, owner, prData.getRepoName(), prData.getPRId(), labels)
+	_, _, err := client.Issues.AddLabelsToIssue(ctx, prData.Owner, prData.getRepoName(), prData.getPRId(), labels)
 	if err != nil {
 		log.Printf("failed to add label to issue due to %v", prettify(err))
 	}
@@ -365,8 +382,7 @@ func postResponseToGitHubRepo(prData PRData, body string) error {
 		Body: &body,
 	}
 
-	owner := RepoCommandsMap[prData.getRepoName()].(map[string]interface{})["owner"].(string)
-	_, resp, err := client.Issues.CreateComment(ctx, owner, prData.getRepoName(), prData.getPRId(), ic)
+	_, resp, err := client.Issues.CreateComment(ctx, prData.Owner, prData.getRepoName(), prData.getPRId(), ic)
 	if err != nil {
 		log.Printf("ERROR occured while printing response to repo: %v", err.Error())
 		return err
@@ -379,5 +395,7 @@ func main() {
 	GetCommands()
 	log.Println("server started")
 	http.HandleFunc("/webhook", handleWebhook)
+	http.HandleFunc("/health", handleHealth)
+	http.HandleFunc("/test", handleTest)
 	log.Fatal(http.ListenAndServe(":8089", nil))
 }

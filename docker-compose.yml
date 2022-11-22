@@ -1,7 +1,7 @@
 version: "3.4"
 services:
   rabbit:
-    hostname: rabbitmq.sblab.uk
+    hostname: webhook.cloudstack.cloud
     image: "rabbitmq:3.8.3-management-alpine"
     ports:
       - "5671:5671"   # For TLS
@@ -13,13 +13,14 @@ services:
       - GID=101
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-      - RABBITMQ_SSL_CACERTFILE=/cert/ca_certificate.pem
-      - RABBITMQ_SSL_CERTFILE=/cert/server_rabbitmq.sblab.uk_certificate.pem
-      - RABBITMQ_SSL_KEYFILE=/cert/server_rabbitmq.sblab.uk_key.pem
+      - RABBITMQ_SSL_CACERTFILE=/cert/fullchain.pem
+      - RABBITMQ_SSL_CERTFILE=/cert/cert.pem
+      - RABBITMQ_SSL_KEYFILE=/cert/privkey.pem
       - RABBITMQ_SSL_VERIFY=verify_peer
-      - RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT=true
+      - RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT=false
+      - RABBITMQ_SSL_DEPTH=2
     volumes:
-      - "./certificates:/cert" 
+      - "./certificates:/cert"
     env_file:
       - .env
     restart: on-failure
@@ -30,7 +31,7 @@ services:
     ports:
       - "8089:8089"
     env_file:
-      - .env 
+      - .env
     depends_on:
       - rabbit
     restart: on-failure

@@ -1,12 +1,12 @@
 {
 	"cluster-api-provider-cloudstack": {
-		"owner": "pearl1594", 
+		"owner": "kubernetes-sigs",
 		"/run-e2e": {
-			"project":      "test-capc-builder",
+			"project":      "capc-e2e",
 			"exchangeName": "CAPCExchange",
-			"queues": 		["capc_builder_queue1", "capc_builder_queue2", "capc_builder_queue3"],
+			"queues": 	["capc_builder_queue1"],
 			"args":         ["K8S_VERSION", "HYPERVISOR", "OS", "ACS_VERSION"],
-			"K8S_VERSION":  ["1.23.3", "1.22.6"],
+			"K8S_VERSION":  ["1.24.7", "1.23.3", "1.22.6"],
 			"HYPERVISOR":   ["kvm", "xen", "vmware"],
 			"OS":           ["ubuntu-2004", "rockylinux-8"],
 			"ACS_VERSION":  ["4.16", "4.14", "4.17"]
