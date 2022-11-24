@@ -1,6 +1,7 @@
 {
 	"cluster-api-provider-cloudstack": {
 		"owner": "kubernetes-sigs",
+		"ownersfile": "https://raw.githubusercontent.com/kubernetes-sigs/cluster-api-provider-cloudstack/main/OWNERS",
 		"/run-e2e": {
 			"project":      "capc-e2e",
 			"exchangeName": "CAPCExchange",

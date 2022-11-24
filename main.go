@@ -207,7 +207,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 			if IfValidCommand(repoName, command) {
 				prData.ExchangeName = RepoCommandsMap[repoName].(map[string]interface{})[command].(map[string]interface{})["exchangeName"].(string)
 				prData.Queues = converToStringArray(RepoCommandsMap[repoName].(map[string]interface{})[command].(map[string]interface{})["queues"].([]interface{}))
-				err = handleCommand(command, args, *prData)
+				err = handleCommand(*event.Comment.User.Login, command, args, *prData)
 			} else {
 				log.Println("Not a command for me, ignoring..")
 				// helpertext := PrintCommandsList(*prData)
@@ -280,7 +280,31 @@ func validateCommandArgs(prData PRData, repoData map[string]interface{}, cmd str
 	return true, dataParams
 }
 
-func handleCommand(command string, args []string, prData PRData) error {
+func validateCaller(ownersfile string, caller string) error {
+	caller = "  - " + caller
+	response, err := http.Get(ownersfile)
+	if err != nil {
+		return err
+	}
+	data, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+	owners := strings.Split(string(data), "\n")
+	for _, owner := range owners {
+		if owner == caller {
+			log.Println("Caller is in OWNERS file")
+			return nil
+		}
+	}
+	return fmt.Errorf("Caller is NOT in OWNERS file")
+}
+
+func handleCommand(caller string, command string, args []string, prData PRData) error {
+	err := validateCaller(RepoCommandsMap[prData.getRepoName()].(map[string]interface{})["ownersfile"].(string), caller)
+	if err != nil {
+		return err
+	}
 	repoData := RepoCommandsMap[prData.getRepoName()].(map[string]interface{})[command].(map[string]interface{})
 	var dataParams []JobData
 	if len(args) > 0 {
@@ -323,7 +347,7 @@ func handleCommand(command string, args []string, prData PRData) error {
 		Message:      data,
 	}
 	log.Println("Publishing job request to message broker")
-	err := msgbroker.PublishMessage(msg)
+	err = msgbroker.PublishMessage(msg)
 	if err != nil {
 		log.Println("FAILED to public message to broker")
 		postResponseToGitHubRepo(prData, fmt.Sprintf("Failed to start Jenkins job for `%s`", command))
